@@ -347,3 +347,41 @@ test "throughput counter" {
     .record(0).record(10).record(20)
   assert_eq(tc.total_count(), 3)
 }
+
+test "log router splits errors" {
+  let logger = Logger::new().build()
+  let router = LogRouter::new(logger)
+  let r2 = router.dispatch(Level::INFO, "info msg", [])
+  let r3 = r2.dispatch(Level::ERROR, "error msg", [])
+  let r4 = r3.dispatch(Level::WARN, "warn msg", [])
+  assert_eq(r4.all_count(), 3)
+  assert_eq(r4.error_count(), 2)
+}
+
+test "log router error logs only" {
+  let logger = Logger::new().build()
+  let router = LogRouter::new(logger)
+  let r2 = router.dispatch(Level::DEBUG, "debug msg", [])
+  let r3 = r2.dispatch(Level::INFO, "info msg", [])
+  assert_eq(r3.all_count(), 2)
+  assert_eq(r3.error_count(), 0)
+}
+
+test "typed fields to pairs conversion" {
+  let fields : Array[TypedField] = []
+  fields.push(TypedField::new_str("name", "test"))
+  fields.push(TypedField::new_int("age", 25))
+  fields.push(TypedField::new_bool("ok", false))
+  let pairs = typed_fields_to_pairs(fields, 0, [])
+  assert_eq(pairs.length(), 3)
+  assert_eq(pairs[1].0, "age")
+  assert_eq(pairs[1].1, "25")
+}
+
+test "pipeline transform count" {
+  let p = Pipeline::new()
+    .add_field("a", "1")
+    .prepend_msg("[PREFIX]")
+    .redact("secret")
+  assert_eq(p.transform_count(), 3)
+}
