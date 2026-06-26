@@ -10,8 +10,8 @@ pub fn level_to_string(l : Level) -> String {
   match l {
     Level::TRACE => "TRACE"
     Level::DEBUG => "DEBUG"
-    Level::INFO => "INFO "
-    Level::WARN => "WARN "
+    Level::INFO => "INFO"
+    Level::WARN => "WARN"
     Level::ERROR => "ERROR"
   }
 }
