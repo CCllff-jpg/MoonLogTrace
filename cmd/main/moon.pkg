@@ -1,0 +1,7 @@
+// import {
+//   "Mitsuha/MoonLogTrace" @lib,
+// }
+
+options(
+  "is-main": true,
+)
