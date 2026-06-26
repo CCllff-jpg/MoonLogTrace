@@ -186,3 +186,75 @@ test "deny list filter" {
   assert_eq(f.check(Level::INFO), true)
   assert_eq(f.check(Level::DEBUG), false)
 }
+
+test "logfmt format" {
+  let r = LogRecord::new(Level::INFO, "test", [("key", "val")], 100)
+  let s = format_logfmt(r)
+  assert_eq(s.contains("ts=100"), true)
+  assert_eq(s.contains("level=INFO"), true)
+  assert_eq(s.contains("key=val"), true)
+}
+
+test "xml format" {
+  let r = LogRecord::new(Level::WARN, "warn", [("code", "1")], 0)
+  let s = format_xml(r)
+  assert_eq(s.contains("<log"), true)
+  assert_eq(s.contains("</log>"), true)
+  assert_eq(s.contains("<code>1</code>"), true)
+}
+
+test "pattern format" {
+  let r = LogRecord::new(Level::INFO, "hello", [("a", "1")], 42)
+  let s = format_pattern(r, "{t} [{l}] {m}")
+  assert_eq(s.contains("42"), true)
+  assert_eq(s.contains("INFO"), true)
+  assert_eq(s.contains("hello"), true)
+}
+
+test "parse level from string" {
+  assert_eq(level_ordinal(parse_level("debug")), 1)
+  assert_eq(level_ordinal(parse_level("WARN")), 3)
+  assert_eq(level_ordinal(parse_level("warning")), 3)
+  assert_eq(level_ordinal(parse_level("ERROR")), 4)
+  assert_eq(level_ordinal(parse_level("unknown")), 2) // default to INFO
+}
+
+test "is valid level" {
+  assert_eq(is_valid_level("info"), true)
+  assert_eq(is_valid_level("INFO"), true)
+  assert_eq(is_valid_level("critical"), false)
+}
+
+test "level names" {
+  let names = level_names()
+  assert_eq(names.length(), 5)
+  assert_eq(names[0], "TRACE")
+}
+
+test "config creates dev logger" {
+  let logger = create_dev_logger()
+  let l2 = logger.debug("dev msg", [])
+  assert_eq(l2.logs().length(), 1)
+}
+
+test "config creates prod logger" {
+  let logger = create_prod_logger()
+  let l2 = logger.info("prod msg", [])
+  assert_eq(l2.logs().length(), 1)
+}
+
+test "batch logger accumulates" {
+  let bl = BatchLogger::new(Logger::new().build(), 3)
+  assert_eq(bl.pending(), 0)
+  let bl2 = bl.info("first", [])
+  let bl3 = bl2.info("second", [])
+  assert_eq(bl3.pending(), 2)
+}
+
+test "batch logger flushes at size" {
+  let base = Logger::new().build()
+  let bl = BatchLogger::new(base, 2)
+  let bl2 = bl.info("one", [])
+  let bl3 = bl2.info("two", [])
+  assert_eq(bl3.pending(), 0)
+}

@@ -87,3 +87,83 @@ pub fn format_plain(record : LogRecord) -> String {
   let result = level_to_string(record.level).trim_space().to_string() + " " + record.message
   format_fields(result, record.fields, 0)
 }
+
+// Pattern formatter with configurable format
+// Supports: {t} = timestamp, {l} = level, {m} = message, {f} = fields
+pub fn format_pattern(record : LogRecord, pattern : String) -> String {
+  replace_pattern(pattern, record, 0, "")
+}
+
+fn replace_pattern(pattern : String, record : LogRecord, idx : Int, result : String) -> String {
+  if idx >= pattern.length() { result }
+  else {
+    let ch = pattern.substring(start=idx, end=idx + 1)
+    if ch == "{" {
+      if idx + 2 < pattern.length() && pattern.substring(start=idx + 2, end=idx + 3) == "}" {
+        let key = pattern.substring(start=idx + 1, end=idx + 2)
+        let replacement = get_pattern_value(key, record)
+        replace_pattern(pattern, record, idx + 3, result + replacement)
+      } else {
+        replace_pattern(pattern, record, idx + 1, result + ch)
+      }
+    } else {
+      replace_pattern(pattern, record, idx + 1, result + ch)
+    }
+  }
+}
+
+fn get_pattern_value(key : String, record : LogRecord) -> String {
+  if key == "t" { record.timestamp.to_string() }
+  else if key == "l" { level_to_string(record.level).trim_space().to_string() }
+  else if key == "m" { record.message }
+  else if key == "f" { format_all_fields(record.fields, 0, "") }
+  else { "{" + key + "}" }
+}
+
+fn format_all_fields(fields : Array[(String, String)], idx : Int, result : String) -> String {
+  if idx >= fields.length() { result }
+  else {
+    let (k, v) = fields[idx]
+    let sep = if idx > 0 { " " } else { "" }
+    format_all_fields(fields, idx + 1, result + sep + k + "=" + v)
+  }
+}
+
+// Logfmt format: key=value pairs, level and message as special keys
+pub fn format_logfmt(record : LogRecord) -> String {
+  let result = "ts=" + record.timestamp.to_string() +
+    " level=" + level_to_string(record.level).trim_space().to_string() +
+    " msg=\"" + record.message + "\""
+  format_logfmt_fields(result, record.fields, 0)
+}
+
+fn format_logfmt_fields(result : String, fields : Array[(String, String)], idx : Int) -> String {
+  if idx >= fields.length() { result }
+  else {
+    let (k, v) = fields[idx]
+    let new_result = result + " " + k + "=" + v
+    format_logfmt_fields(new_result, fields, idx + 1)
+  }
+}
+
+// XML format
+pub fn format_xml(record : LogRecord) -> String {
+  let result = "<log ts=\"" + record.timestamp.to_string() +
+    "\" level=\"" + level_to_string(record.level).trim_space().to_string() +
+    "\"><msg>" + record.message + "</msg>"
+  format_xml_fields(result, record.fields, 0) + "</log>"
+}
+
+fn format_xml_fields(result : String, fields : Array[(String, String)], idx : Int) -> String {
+  if idx >= fields.length() { result }
+  else {
+    let (k, v) = fields[idx]
+    let new_result = result + "<" + k + ">" + v + "</" + k + ">"
+    format_xml_fields(new_result, fields, idx + 1)
+  }
+}
+
+// NDJSON (Newline Delimited JSON) — same as JSON but guaranteed single line
+pub fn format_ndjson(record : LogRecord) -> String {
+  format_json(record)
+}
