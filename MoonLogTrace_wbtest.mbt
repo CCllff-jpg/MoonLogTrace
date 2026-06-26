@@ -258,3 +258,92 @@ test "batch logger flushes at size" {
   let bl3 = bl2.info("two", [])
   assert_eq(bl3.pending(), 0)
 }
+
+test "typed field string" {
+  let f = TypedField::new_str("key", "val")
+  let (k, v) = f.to_pair()
+  assert_eq(k, "key")
+  assert_eq(v, "val")
+}
+
+test "typed field int" {
+  let f = TypedField::new_int("count", 42)
+  let (_, v) = f.to_pair()
+  assert_eq(v, "42")
+}
+
+test "typed field bool" {
+  let f = TypedField::new_bool("active", true)
+  let (_, v) = f.to_pair()
+  assert_eq(v, "true")
+}
+
+test "syslog format" {
+  let r = LogRecord::new(Level::ERROR, "disk full", [], 100)
+  let s = format_syslog(r, "myapp")
+  assert_eq(s.contains("<"), true)
+  assert_eq(s.contains("myapp"), true)
+  assert_eq(s.contains("disk full"), true)
+}
+
+test "gelf format" {
+  let r = LogRecord::new(Level::INFO, "test", [("env", "prod")], 200)
+  let s = format_gelf(r, "server1")
+  assert_eq(s.contains("server1"), true)
+  assert_eq(s.contains("test"), true)
+  assert_eq(s.contains("_env"), true)
+}
+
+test "correlation id sequence" {
+  let c = CorrelationId::new("req-1")
+  assert_eq(c.id, "req-1")
+  let c2 = c.next().next()
+  assert_eq(c2.sequence, 2)
+}
+
+test "request context logging" {
+  let logger = Logger::new().build()
+  let ctx = RequestContext::new(logger, "req-42")
+  let ctx2 = ctx.info("step1", [("action", "validate")])
+  let ctx3 = ctx2.warn("step2", [])
+  let l = ctx3.finish()
+  let logs = l.logs()
+  assert_eq(logs.length(), 3)
+  assert_eq(logs[0].contains("corr_id"), true)
+}
+
+test "pipeline add field" {
+  let p = Pipeline::new().add_field("source", "api")
+  let r = LogRecord::new(Level::INFO, "msg", [], 0)
+  let r2 = p.apply(r)
+  assert_eq(r2.fields.length(), 1)
+}
+
+test "pipeline redact" {
+  let p = Pipeline::new().redact("password")
+  let r = LogRecord::new(Level::INFO, "login", [("password", "secret")], 0)
+  let r2 = p.apply(r)
+  assert_eq(r2.fields[0].1, "***")
+}
+
+test "pipeline prepend message" {
+  let p = Pipeline::new().prepend_msg("[API] ")
+  let r = LogRecord::new(Level::INFO, "start", [], 0)
+  let r2 = p.apply(r)
+  assert_eq(r2.message.contains("[API]"), true)
+}
+
+test "meter rate limiter" {
+  let (rl, ok1) = RateLimiter::new(2, 100).allow(10)
+  let (rl2, ok2) = rl.allow(20)
+  let (_, ok3) = rl2.allow(30)
+  assert_eq(ok1, true)
+  assert_eq(ok2, true)
+  assert_eq(ok3, false)
+}
+
+test "throughput counter" {
+  let tc = ThroughputCounter::new("api")
+    .record(0).record(10).record(20)
+  assert_eq(tc.total_count(), 3)
+}
