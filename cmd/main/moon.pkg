@@ -1,5 +1,5 @@
 import {
-  "Mitsuha/MoonLogTrace",
+  "clf060328/MoonLogTrace",
 }
 
 options(

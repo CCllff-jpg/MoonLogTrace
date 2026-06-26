@@ -1,12 +1,12 @@
 // MoonLogTrace — Structured Logging & Tracing Library for MoonBit
 
-name = "Mitsuha/MoonLogTrace"
+name = "clf060328/MoonLogTrace"
 
 version = "0.1.0"
 
 readme = "README.mbt.md"
 
-repository = "https://gitlink.org.cn/Mitsuha/MoonLogTrace"
+repository = "https://gitlink.org.cn/clf060328/MoonLogTrace"
 
 license = "Apache-2.0"
 

@@ -19,7 +19,7 @@
 ## 安装
 
 ```
-moon add Mitsuha/MoonLogTrace
+moon add clf060328/MoonLogTrace
 ```
 
 ## 快速开始
