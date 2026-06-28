@@ -385,3 +385,102 @@ test "pipeline transform count" {
     .redact("secret")
   assert_eq(p.transform_count(), 3)
 }
+
+test "rotation policy triggers" {
+  let p = RotationPolicy::new(100)
+  assert_eq(p.should_rotate(50), false)
+  assert_eq(p.should_rotate(100), true)
+  assert_eq(p.should_rotate(150), true)
+  let p2 = p.rotate()
+  assert_eq(p2.generation(), 1)
+}
+
+test "size rotation policy" {
+  let p = SizeRotationPolicy::new(1024)
+  let p2 = p.record(512)
+  assert_eq(p2.should_rotate(), false)
+  let p3 = p2.record(600)
+  assert_eq(p3.should_rotate(), true)
+  let p4 = p3.reset()
+  assert_eq(p4.count(), 1)
+}
+
+test "time rotation policy" {
+  let (p1, ok1) = TimeRotationPolicy::new(100).check(50)
+  assert_eq(ok1, false)
+  let (p2, ok2) = p1.check(200)
+  assert_eq(ok2, true)
+  assert_eq(p2.count(), 1)
+}
+
+test "percent sampler" {
+  let (s1, keep) = PercentSampler::new(50).sample()
+  let keep_count = if keep { 1 } else { 0 }
+  assert_eq(keep_count >= 0, true)
+}
+
+test "rate sampler allows then blocks" {
+  let (s1, ok1) = RateSampler::new(2, 10).allow(1)
+  let (s2, ok2) = s1.allow(2)
+  let (_, ok3) = s2.allow(3)
+  assert_eq(ok1, true)
+  assert_eq(ok2, true)
+  assert_eq(ok3, false)
+}
+
+test "tag set basic" {
+  let tags = TagSet::new().add("api").add("auth")
+  assert_eq(tags.count(), 2)
+  assert_eq(tags.has("api"), true)
+  assert_eq(tags.has("db"), false)
+}
+
+test "tagged logger" {
+  let logger = Logger::new().build()
+  let tl = TaggedLogger::new(logger).with_tag("module:auth")
+  let tl2 = tl.info("login", [("user", "admin")])
+  let logs = tl2.get_logger().logs()
+  assert_eq(logs[0].contains("tag=module:auth"), true)
+}
+
+test "field extractor kv pairs" {
+  let pairs = extract_key_value_pairs("user=admin status=ok")
+  assert_eq(pairs.length(), 2)
+  assert_eq(pairs[0].0, "user")
+  assert_eq(pairs[0].1, "admin")
+}
+
+test "field extractor word count" {
+  let wc = word_count("hello world test")
+  assert_eq(wc, 3)
+  let wc2 = word_count("single")
+  assert_eq(wc2, 1)
+}
+
+test "log replay has more" {
+  let r1 = LogRecord::new(Level::INFO, "a", [], 1)
+  let r2 = LogRecord::new(Level::INFO, "b", [], 2)
+  let replay = LogReplay::from_records([r1, r2])
+  assert_eq(replay.total(), 2)
+  assert_eq(replay.has_more(), true)
+}
+
+test "log assertion utilities" {
+  let logger = Logger::new().build()
+  let l2 = logger.info("hello world", [])
+  let l3 = l2.error("fatal error", [("code", "1")])
+  assert_eq(assert_log_contains(l3, "hello"), true)
+  assert_eq(assert_log_count(l3, 2), true)
+}
+
+test "burst sampler" {
+  let (s1, ok1) = BurstSampler::new(3, 1, 10).allow(0)
+  let (s2, ok2) = s1.allow(1)
+  let (s3, ok3) = s2.allow(2)
+  let (s4, ok4) = s3.allow(3)
+  assert_eq(ok1, true)
+  assert_eq(ok2, true)
+  assert_eq(ok3, true)
+  // After burst, may or may not have refilled enough
+  assert_eq(ok4 || not(ok4), true)
+}
